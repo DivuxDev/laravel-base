@@ -6,7 +6,12 @@ set -e
 # Auto-generate APP_KEY if not provided (Coolify may not set it on first boot)
 if [ -z "$APP_KEY" ]; then
     echo "APP_KEY not set — generating a new one..."
+    # key:generate writes to .env; create the file first if it doesn't exist
+    [ -f /var/www/html/.env ] || touch /var/www/html/.env
     php artisan key:generate --force
+    # Export so config:cache and apache child processes both see the new key
+    APP_KEY=$(grep "^APP_KEY=" /var/www/html/.env | cut -d= -f2-)
+    export APP_KEY
 fi
 
 # Run migrations
