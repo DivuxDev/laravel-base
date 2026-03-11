@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM php:8.2-apache AS builder
+FROM php:8.4-apache AS builder
 
 # Set working directory
 WORKDIR /var/www/html
@@ -49,7 +49,7 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
 # Stage 2: Runtime
-FROM php:8.2-apache
+FROM php:8.4-apache
 
 WORKDIR /var/www/html
 
