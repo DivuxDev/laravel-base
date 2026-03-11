@@ -98,9 +98,5 @@ ENV APP_DEBUG=false
 # Expose port 80
 EXPOSE 80
 
-# Health check — start-period must cover migrations (first deploy can take 60s+)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
-    CMD curl -fsS http://localhost/api/health || exit 1
-
 # Start entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]

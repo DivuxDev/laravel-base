@@ -14,12 +14,23 @@ if [ -z "$APP_KEY" ]; then
     export APP_KEY
 fi
 
+# Regenerate package manifest from the actual installed vendor directory.
+# This MUST run before anything else that boots the framework, because the
+# committed bootstrap/cache/services.php may list dev-only providers
+# (Pail, Sail, Collision…) that are absent when built with --no-dev.
+echo "Discovering packages..."
+php artisan package:discover --ansi
+
 # Run migrations
 echo "Running migrations..."
 php artisan migrate --force
 
 # Link storage (creates public/storage -> storage/app/public symlink)
 php artisan storage:link --force 2>/dev/null || true
+
+# Fix permissions on volume-mounted directories.
+# Docker bind mounts override the Dockerfile's chown, so we re-apply here.
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Clear caches
 echo "Clearing caches..."
