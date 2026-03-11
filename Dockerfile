@@ -54,6 +54,7 @@ WORKDIR /var/www/html
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y \
     curl \
+    wget \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
