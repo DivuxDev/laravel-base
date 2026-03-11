@@ -31,14 +31,12 @@ RUN docker-php-ext-install \
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Copy composer files
-COPY composer.json composer.lock* ./
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-ansi --no-interaction
-
-# Copy application files
+# Copy all application files (including artisan) before composer install
 COPY . .
+
+# Install PHP dependencies (artisan now exists for post-install scripts)
+RUN composer install --no-dev --optimize-autoloader --no-ansi --no-interaction
 
 # Install Node dependencies and build assets
 RUN npm install && npm run build
