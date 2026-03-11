@@ -5,7 +5,7 @@
 /.venv
 /bootstrap/cache/*
 /storage/logs/*
-/storage/app/*
+/storage/app/public/*
 /tests
 /node_modules
 npm-debug.log
@@ -16,4 +16,3 @@ yarn-error.log
 .vscode
 /.editorconfig
 /phpunit.xml
-composer.lock
