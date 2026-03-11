@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM php:8.2-apache as builder
+FROM php:8.2-apache AS builder
 
 # Set working directory
 WORKDIR /var/www/html
