@@ -127,6 +127,24 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        // ─── Application lifecycle (boot events) ──────────────────────────────
+        'app' => [
+            'driver'              => 'daily',
+            'path'                => storage_path('logs/app.log'),
+            'level'               => env('LOG_LEVEL', 'debug'),
+            'days'                => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
+        // ─── HTTP request / response audit trail ──────────────────────────────
+        'http' => [
+            'driver'              => 'daily',
+            'path'                => storage_path('logs/http.log'),
+            'level'               => env('LOG_LEVEL', 'debug'),
+            'days'                => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

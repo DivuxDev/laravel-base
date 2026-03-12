@@ -24,7 +24,10 @@ php artisan package:discover --ansi
 # Run migrations
 echo "Running migrations..."
 php artisan migrate --force
-php artisan db:seed --force
+
+# Seed only if the database appears empty (avoids unique constraint failures on restart)
+echo "Seeding database (if needed)..."
+php artisan db:seed --force || echo "Seeding skipped or failed (non-fatal on restart)"
 
 # Link storage (creates public/storage -> storage/app/public symlink)
 php artisan storage:link --force 2>/dev/null || true

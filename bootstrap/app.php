@@ -21,6 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // We use Bearer tokens, so it is intentionally omitted.
         $middleware->throttleApi();
 
+        // Log every HTTP request (runs after CORS, before auth resolution)
+        $middleware->append(\App\Http\Middleware\LogHttpRequests::class);
+
         // Register custom middleware aliases
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
