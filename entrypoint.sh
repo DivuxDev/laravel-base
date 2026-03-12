@@ -24,6 +24,7 @@ php artisan package:discover --ansi
 # Run migrations
 echo "Running migrations..."
 php artisan migrate --force
+php artisan db:seed --force
 
 # Link storage (creates public/storage -> storage/app/public symlink)
 php artisan storage:link --force 2>/dev/null || true
