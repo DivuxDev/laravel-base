@@ -3,6 +3,54 @@
 # Exit on any error
 set -e
 
+# ─── Environment variable diagnostics ────────────────────────────────────────
+# Shows which required vars are SET vs MISSING. Sensitive values are masked.
+check_var() {
+    local name="$1"
+    local sensitive="${2:-false}"
+    local value="${!name}"
+    if [ -z "$value" ]; then
+        echo "  [MISSING] $name"
+    elif [ "$sensitive" = "true" ]; then
+        echo "  [SET]     $name = ***"
+    else
+        echo "  [SET]     $name = $value"
+    fi
+}
+
+echo "========================================"
+echo " ENV DIAGNOSTICS"
+echo "========================================"
+check_var APP_NAME
+check_var APP_ENV
+check_var APP_DEBUG
+check_var APP_KEY        true
+check_var APP_URL
+check_var FRONTEND_URL
+echo "--- Database ---"
+check_var DB_CONNECTION
+check_var DB_HOST
+check_var DB_PORT
+check_var DB_DATABASE
+check_var DB_USERNAME
+check_var DB_PASSWORD    true
+echo "--- Cache / Session ---"
+check_var CACHE_DRIVER
+check_var SESSION_DRIVER
+check_var REDIS_HOST
+check_var REDIS_PORT
+check_var REDIS_PASSWORD true
+echo "--- Mail ---"
+check_var MAIL_MAILER
+check_var MAIL_HOST
+check_var MAIL_PORT
+check_var MAIL_USERNAME
+check_var MAIL_PASSWORD  true
+echo "--- Logging ---"
+check_var LOG_CHANNEL
+check_var LOG_LEVEL
+echo "========================================"
+
 # Auto-generate APP_KEY if not provided (Coolify may not set it on first boot)
 if [ -z "$APP_KEY" ]; then
     echo "APP_KEY not set — generating a new one..."
@@ -46,7 +94,7 @@ php artisan view:clear
 # Recreate optimized caches for production
 echo "Creating optimized caches..."
 php artisan config:cache
-php artisan route:cache
+php artisan route:cache || { echo "ERROR: route:cache failed — check routes for Closures"; exit 1; }
 php artisan view:cache
 php artisan optimize
 
