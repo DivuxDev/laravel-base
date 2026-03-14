@@ -51,6 +51,10 @@ check_var LOG_CHANNEL
 check_var LOG_LEVEL
 echo "========================================"
 
+# Force logs to stderr so Coolify/Docker always shows them regardless of .env
+export LOG_CHANNEL=stderr
+export LOG_LEVEL=debug
+
 # Auto-generate APP_KEY if not provided (Coolify may not set it on first boot)
 if [ -z "$APP_KEY" ]; then
     echo "APP_KEY not set — generating a new one..."

@@ -30,6 +30,18 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // In debug mode expose the full exception in the JSON response so errors
+        // are visible without needing to access log files (useful in Coolify).
+        $exceptions->render(function (\Throwable $e, \Illuminate\Http\Request $request) {
+            if ($request->expectsJson() && config('app.debug')) {
+                return response()->json([
+                    'message'   => $e->getMessage(),
+                    'exception' => get_class($e),
+                    'file'      => $e->getFile(),
+                    'line'      => $e->getLine(),
+                    'trace'     => collect($e->getTrace())->take(10)->toArray(),
+                ], 500);
+            }
+        });
     })->create();
 
