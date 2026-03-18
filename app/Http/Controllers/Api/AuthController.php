@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\UserLoggedIn;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
@@ -56,6 +57,14 @@ class AuthController extends Controller
         $user->tokens()->delete();
 
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        // Broadcast login event — runs async via queue worker.
+        // Wrapped in try/catch so login always succeeds even if Reverb is not running.
+        try {
+            broadcast(new UserLoggedIn($user));
+        } catch (\Throwable) {
+            // WebSocket server unavailable — login proceeds normally
+        }
 
         return response()->json([
             'success' => true,

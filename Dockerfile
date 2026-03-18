@@ -78,9 +78,10 @@ RUN a2enmod rewrite headers
 # Configure Apache VirtualHost
 COPY .docker/vhost.conf /etc/apache2/sites-available/000-default.conf
 
-# Copy entrypoint script before app files
+# Copy entrypoint scripts before app files
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY entrypoint-reverb.sh /entrypoint-reverb.sh
+RUN chmod +x /entrypoint.sh /entrypoint-reverb.sh
 
 # Copy application from builder
 COPY --from=builder /var/www/html /var/www/html

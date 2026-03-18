@@ -104,5 +104,10 @@ php artisan optimize
 
 echo "Setup completed successfully!"
 
-# Start Apache
-exec apache2-foreground
+# Start requested service — pass args to run something other than Apache
+# e.g. docker-compose command: php artisan reverb:start --host=0.0.0.0 --port=8081
+if [ $# -gt 0 ]; then
+    exec "$@"
+else
+    exec apache2-foreground
+fi
