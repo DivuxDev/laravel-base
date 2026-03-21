@@ -6,7 +6,10 @@ use App\Events\UserLoggedIn;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Mail\WelcomeEmail;
 use App\Models\User;
+use App\Services\AuditService;
+use App\Services\MailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +17,8 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    public function __construct(private MailService $mail) {}
+
     /**
      * Register a new user and return a token.
      */
@@ -26,6 +31,19 @@ class AuthController extends Controller
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        try {
+            $this->mail->send(new WelcomeEmail($user), $user->email);
+        } catch (\Throwable) {
+            // Mail unavailable — registration proceeds normally
+        }
+
+        AuditService::log('user.registered', [
+            'user_id'        => $user->id,
+            'auditable_type' => User::class,
+            'auditable_id'   => $user->id,
+            'new_values'     => ['name' => $user->name, 'email' => $user->email],
+        ]);
 
         return response()->json([
             'success' => true,
@@ -42,7 +60,27 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): JsonResponse
     {
+        /** @var User|null $user */
+        $user = User::where('email', $request->email)->first();
+
+        // Brute force: check lockout before attempting authentication
+        if ($user && $user->isLockedOut()) {
+            $seconds   = (int) now()->diffInSeconds($user->locked_until, false);
+            $minutes   = (int) ceil($seconds / 60);
+
+            return response()->json([
+                'success' => false,
+                'data'    => ['locked_for_seconds' => max(0, $seconds)],
+                'message' => "Account locked due to too many failed attempts. Try again in {$minutes} minute(s).",
+            ], 423);
+        }
+
         if (! Auth::attempt($request->only('email', 'password'))) {
+            // Increment failure counter on known accounts only
+            if ($user) {
+                $user->incrementFailedAttempts();
+            }
+
             return response()->json([
                 'success' => false,
                 'data'    => null,
@@ -52,6 +90,9 @@ class AuthController extends Controller
 
         /** @var User $user */
         $user = Auth::user();
+
+        // Clear any previous failed attempts on successful login
+        $user->resetFailedAttempts();
 
         // Revoke all previous tokens for a clean session
         $user->tokens()->delete();
@@ -65,6 +106,12 @@ class AuthController extends Controller
         } catch (\Throwable) {
             // WebSocket server unavailable — login proceeds normally
         }
+
+        AuditService::log('user.login', [
+            'user_id'        => $user->id,
+            'auditable_type' => User::class,
+            'auditable_id'   => $user->id,
+        ]);
 
         return response()->json([
             'success' => true,

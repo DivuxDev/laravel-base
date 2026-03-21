@@ -26,6 +26,8 @@ class User extends Authenticatable
         'google_id',
         'avatar',
         'role',
+        'failed_login_attempts',
+        'locked_until',
     ];
 
     /**
@@ -48,7 +50,8 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
+            'locked_until'      => 'datetime',
         ];
     }
 
@@ -58,5 +61,40 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    /**
+     * Determine whether the account is currently locked out.
+     */
+    public function isLockedOut(): bool
+    {
+        return $this->locked_until !== null && $this->locked_until->isFuture();
+    }
+
+    /**
+     * Increment failed login attempts and lock the account after 5 failures.
+     */
+    public function incrementFailedAttempts(): void
+    {
+        $attempts = $this->failed_login_attempts + 1;
+
+        $updates = ['failed_login_attempts' => $attempts];
+
+        if ($attempts >= 5) {
+            $updates['locked_until'] = now()->addMinutes(15);
+        }
+
+        $this->update($updates);
+    }
+
+    /**
+     * Clear failed login attempts and remove any lockout.
+     */
+    public function resetFailedAttempts(): void
+    {
+        $this->update([
+            'failed_login_attempts' => 0,
+            'locked_until'          => null,
+        ]);
     }
 }

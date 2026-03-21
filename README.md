@@ -1,59 +1,419 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Laravel Base API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+REST API backend built with **Laravel 12**, **Sanctum** token authentication, **Google OAuth**, **Laravel Reverb** WebSockets, and **Mailtrap** email delivery. Designed to pair with the [vue-base-template](../vue-base-template) frontend.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Layer | Technology |
+|---|---|
+| Framework | Laravel 12 (PHP 8.4) |
+| Auth | Laravel Sanctum (Bearer tokens) |
+| OAuth | Laravel Socialite — Google |
+| WebSockets | Laravel Reverb |
+| Mail | Mailtrap SMTP |
+| Database | MySQL |
+| Deployment | Docker / Coolify |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Features
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- **Authentication** — Register, login, logout with Sanctum Bearer tokens
+- **Google OAuth** — Login with Google via Socialite
+- **Role-based access** — Admin/user roles with middleware guard
+- **Brute force protection** — Account lockout after 5 failed login attempts (15 min)
+- **Password policy** — Requires uppercase, lowercase, number, and special character
+- **Security headers** — X-Content-Type-Options, X-Frame-Options, HSTS, Referrer-Policy, Permissions-Policy
+- **Rate limiting** — Per-route throttling: login (10/min), register (5/min), admin (30/min), user API (60/min)
+- **Audit logging** — Automatic logging of admin actions (role changes, password resets, deletions) and auth events
+- **Pagination & filtering** — Generic `Filterable` trait with search, sort, and pagination for any endpoint
+- **Profile editing** — Update name and upload avatar
+- **WebSocket events** — Real-time login notifications via Laravel Reverb
+- **Email delivery** — Welcome email on registration via Mailtrap
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-## Laravel Sponsors
+## Quick start
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+# 1. Install PHP dependencies
+composer install
 
-### Premium Partners
+# 2. Copy environment file and fill in your values
+cp .env.example .env
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+# 3. Generate application key
+php artisan key:generate
 
-## Contributing
+# 4. Run database migrations + seeders
+php artisan migrate --seed
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+# 5. Create storage symlink (for avatar uploads)
+php artisan storage:link
 
-## Code of Conduct
+# 6. Start Laravel + Reverb together
+composer dev
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+The API will be available at `http://localhost:8000`.
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Environment variables
 
-## License
+Copy `.env.example` to `.env` and fill in the following:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```env
+APP_KEY=                        # generated by: php artisan key:generate
+APP_URL=http://localhost:8000
+FRONTEND_URL=http://localhost:5173
+
+# Database
+DB_HOST=127.0.0.1
+DB_DATABASE=laravel_api
+DB_USERNAME=root
+DB_PASSWORD=
+
+# Mail — Mailtrap (production sending)
+MAIL_MAILER=smtp
+MAIL_SCHEME=tls
+MAIL_HOST=live.smtp.mailtrap.io
+MAIL_PORT=587
+MAIL_USERNAME=api
+MAIL_PASSWORD=your_mailtrap_api_token   # mailtrap.io → Sending → API Tokens
+MAIL_FROM_ADDRESS="noreply@example.com"
+
+# Google OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/auth/google/callback
+
+# Laravel Reverb (WebSockets)
+REVERB_APP_ID=
+REVERB_APP_KEY=
+REVERB_APP_SECRET=
+REVERB_HOST=localhost
+REVERB_PORT=8081
+REVERB_SCHEME=http
+```
+
+> **Mail Testing (sandbox):** swap `live.smtp.mailtrap.io` for `sandbox.smtp.mailtrap.io` on port `2525` and use the inbox credentials from mailtrap.io → Email Testing.
+
+---
+
+## Running the project
+
+### Development (recommended)
+
+```bash
+composer dev
+```
+
+Starts both servers in parallel using `concurrently`:
+
+| Process | Command | URL |
+|---|---|---|
+| `server` | `php artisan serve` | `http://localhost:8000` |
+| `reverb` | `php artisan reverb:start --debug` | `ws://localhost:8081` |
+
+### Individually
+
+```bash
+php artisan serve
+php artisan reverb:start --debug
+```
+
+---
+
+## Project structure
+
+```
+app/
+├── Events/
+│   └── UserLoggedIn.php           # Broadcast on login via Reverb
+├── Http/
+│   ├── Controllers/Api/
+│   │   ├── AuthController.php     # register, login, logout, user
+│   │   ├── GoogleAuthController.php
+│   │   ├── AdminUserController.php # paginated users, role change, reset pw, delete
+│   │   ├── AuditLogController.php  # paginated audit logs with filters
+│   │   └── ProfileController.php   # update name/avatar
+│   ├── Middleware/
+│   │   ├── EnsureAdmin.php        # role === 'admin' guard
+│   │   ├── LogHttpRequests.php    # HTTP request logging with timing
+│   │   └── SecurityHeaders.php    # X-Frame-Options, HSTS, etc.
+│   ├── Requests/
+│   │   ├── RegisterRequest.php    # validation with password policy
+│   │   ├── LoginRequest.php
+│   │   └── UpdateProfileRequest.php
+│   └── Resources/
+│       ├── UserResource.php
+│       └── AuditLogResource.php
+├── Mail/
+│   └── WelcomeEmail.php           # Sent on register via Mailtrap
+├── Models/
+│   ├── User.php                   # Brute force protection methods
+│   └── AuditLog.php               # Audit log entries
+├── Services/
+│   ├── MailService.php
+│   └── AuditService.php           # Static log() method for audit entries
+├── Traits/
+│   └── Filterable.php             # Generic search, sort, pagination
+└── Providers/
+    └── AppServiceProvider.php     # Rate limiters + app logging
+
+routes/
+├── api.php                        # All API routes with throttling
+└── channels.php                   # Reverb broadcast channels
+
+database/
+├── migrations/
+│   ├── ...
+│   ├── 2026_03_19_100001_add_lockout_fields_to_users_table.php
+│   └── 2026_03_19_100002_create_audit_logs_table.php
+└── seeders/
+    └── DatabaseSeeder.php         # Seeds 3 test users
+```
+
+---
+
+## API endpoints
+
+Base URL: `http://localhost:8000/api`
+
+All responses follow a unified envelope:
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": "string"
+}
+```
+
+### Public routes
+
+| Method | Endpoint | Description | Rate limit |
+|---|---|---|---|
+| `GET` | `/api/health` | Health check — returns `{ "status": "ok" }` | — |
+| `POST` | `/api/auth/register` | Register — returns `{ user, token }` | 5/min per IP |
+| `POST` | `/api/auth/login` | Login — returns `{ user, token }` | 10/min per IP |
+| `GET` | `/api/auth/google/redirect` | Redirects browser to Google consent screen | — |
+| `GET` | `/api/auth/google/callback` | Google callback — redirects to frontend with token | — |
+
+### Protected routes (requires `Authorization: Bearer {token}`)
+
+| Method | Endpoint | Description | Rate limit |
+|---|---|---|---|
+| `POST` | `/api/auth/logout` | Revokes current token | — |
+| `GET` | `/api/user` | Returns authenticated user profile | 60/min |
+| `PUT` | `/api/user/profile` | Update name and/or avatar (multipart/form-data) | — |
+
+### Admin routes (Bearer token + `role = admin`)
+
+All admin routes: **30 req/min** per user.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/admin/users` | List users (paginated, searchable, sortable) |
+| `PATCH` | `/api/admin/users/{id}/role` | Change role (`admin` or `user`). Cannot change own role |
+| `POST` | `/api/admin/users/{id}/reset-password` | Generate random password, revoke all tokens |
+| `DELETE` | `/api/admin/users/{id}` | Delete user. Cannot delete own account |
+| `GET` | `/api/admin/audit-logs` | List audit logs (paginated, filterable by action/date/user) |
+
+### Pagination query params (for paginated endpoints)
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `page` | int | 1 | Page number |
+| `per_page` | int | 15 | Items per page (max 100) |
+| `search` | string | — | Search across searchable columns |
+| `sort` | string | `created_at` | Column to sort by |
+| `sort_dir` | string | `desc` | `asc` or `desc` |
+
+Paginated responses include a `meta` block:
+
+```json
+{
+  "success": true,
+  "data": {
+    "users": [...],
+    "meta": {
+      "current_page": 1,
+      "last_page": 5,
+      "per_page": 15,
+      "total": 72
+    }
+  },
+  "message": "Users retrieved successfully."
+}
+```
+
+---
+
+## Security
+
+### Password policy
+
+Registration requires passwords with:
+- Minimum 8 characters
+- At least one uppercase and one lowercase letter
+- At least one number
+- At least one special character
+
+### Brute force protection
+
+After **5 failed login attempts**, the account is locked for **15 minutes**. The API returns HTTP `423` with `locked_for_seconds` in the response.
+
+### Security headers
+
+Applied globally via `SecurityHeaders` middleware:
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-XSS-Protection: 1; mode=block`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` (production only)
+
+### Rate limiting
+
+| Limiter | Limit | Applied to |
+|---|---|---|
+| `login` | 10/min per IP | `POST /api/auth/login` |
+| `register` | 5/min per IP | `POST /api/auth/register` |
+| `admin` | 30/min per user | All `/api/admin/*` routes |
+| `user-api` | 60/min per user | `GET /api/user` |
+
+---
+
+## Audit logging
+
+Admin actions and auth events are recorded in the `audit_logs` table via `AuditService::log()`.
+
+### Logged events
+
+| Action | Trigger |
+|---|---|
+| `user.login` | Successful login |
+| `user.registered` | New user registration |
+| `admin.user.role_changed` | Admin changes a user's role |
+| `admin.user.password_reset` | Admin resets a user's password |
+| `admin.user.deleted` | Admin deletes a user |
+
+Each entry records: performing user, target model, old/new values, IP address, user agent, and timestamp.
+
+---
+
+## User model
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | int | Auto-increment |
+| `name` | string | |
+| `email` | string | Unique |
+| `password` | string | Hashed, hidden in JSON output |
+| `google_id` | string\|null | Hidden in JSON output |
+| `avatar` | string\|null | Profile picture URL |
+| `role` | string | `user` (default) or `admin` |
+| `failed_login_attempts` | int | Brute force counter (default 0) |
+| `locked_until` | datetime\|null | Account lockout expiration |
+| `created_at` | datetime | |
+
+---
+
+## Seeded test accounts
+
+Created by `php artisan migrate --seed` or `php artisan db:seed`:
+
+| Email | Password | Role |
+|---|---|---|
+| `admin@example.com` | `password` | admin |
+| `user@example.com` | `password` | user |
+| `test@example.com` | `password` | user |
+
+> **Note:** Seeded passwords (`password`) do not meet the new password policy. These accounts are pre-seeded and bypass validation. New registrations must comply.
+
+---
+
+## WebSocket events (Reverb)
+
+After a successful login, the backend broadcasts a real-time event on the public `notifications` channel:
+
+```
+Event name:  user.logged-in
+Channel:     notifications (public)
+Payload:     { id, name, avatar }
+```
+
+The frontend listens with Laravel Echo:
+
+```ts
+echo.channel('notifications').listen('.user.logged-in', (e) => {
+  console.log(e.name, 'just logged in')
+})
+```
+
+> Login always succeeds even if Reverb is not running — the broadcast is wrapped in a try/catch.
+
+---
+
+## Mail
+
+A `WelcomeEmail` is sent automatically on user registration via `MailService`. If mail is unavailable, registration proceeds normally (try/catch).
+
+| Environment | Host | Port | Username | Password |
+|---|---|---|---|---|
+| Production | `live.smtp.mailtrap.io` | `587` | `api` | Your Mailtrap API token |
+| Testing/sandbox | `sandbox.smtp.mailtrap.io` | `2525` | Inbox username | Inbox password |
+
+---
+
+## Google OAuth setup
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Credentials
+2. Create an **OAuth 2.0 Client ID** (Web application)
+3. Add authorized redirect URI: `http://localhost:8000/api/auth/google/callback`
+4. Copy Client ID and Secret into `.env`
+
+**Flow:**
+
+1. Frontend redirects browser to `GET /api/auth/google/redirect`
+2. Google redirects to `GET /api/auth/google/callback`
+3. Backend creates or updates the user (via `updateOrCreate` on email)
+4. Backend redirects to `FRONTEND_URL/auth/callback?token=<sanctum_token>`
+5. Frontend stores the token and navigates to the app
+
+---
+
+## Deployment (Docker / Coolify)
+
+The repo includes a production-ready `Dockerfile`. See [DEPLOYMENT.md](DEPLOYMENT.md) for full step-by-step instructions.
+
+Key production environment differences:
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://your-domain.com
+FRONTEND_URL=https://your-frontend.com
+SANCTUM_STATEFUL_DOMAINS=your-frontend.com
+CACHE_STORE=redis
+SESSION_DRIVER=redis
+REDIS_HOST=redis
+```
+
+---
+
+## Available commands
+
+```bash
+composer dev           # Start Laravel + Reverb concurrently (development)
+composer setup         # Full setup: install deps, .env, key:generate, migrate, build assets
+composer test          # Run PHPUnit test suite
+php artisan migrate    # Run database migrations
+php artisan db:seed    # Seed test users
+php artisan storage:link # Create public storage symlink (required for avatar uploads)
+php artisan tinker     # Interactive REPL
+```

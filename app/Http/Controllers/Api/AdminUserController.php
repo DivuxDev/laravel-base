@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\AuditService;
+use App\Traits\Filterable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -12,25 +14,48 @@ use Illuminate\Validation\Rule;
 
 class AdminUserController extends Controller
 {
+    use Filterable;
+
+    /** Columns that can be searched via ?search= */
+    private const SEARCHABLE = ['name', 'email'];
+
+    /** Columns that can be sorted via ?sort= */
+    private const SORTABLE = ['name', 'email', 'role', 'created_at'];
+
     /**
      * GET /api/admin/users
-     * Lista todos los usuarios ordenados por fecha de creación.
+     * Returns paginated, filterable list of users.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $users = User::orderBy('created_at', 'desc')->get();
+        $query = $this->applyFilters(
+            User::query(),
+            $request,
+            self::SEARCHABLE,
+            self::SORTABLE,
+        );
+
+        $perPage   = $this->resolvePerPage($request);
+        $paginated = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data'    => ['users' => UserResource::collection($users)],
+            'data'    => [
+                'users' => UserResource::collection($paginated->items()),
+                'meta'  => [
+                    'current_page' => $paginated->currentPage(),
+                    'last_page'    => $paginated->lastPage(),
+                    'per_page'     => $paginated->perPage(),
+                    'total'        => $paginated->total(),
+                ],
+            ],
             'message' => 'Users retrieved successfully.',
         ]);
     }
 
     /**
      * PATCH /api/admin/users/{id}/role
-     * Cambia el rol de un usuario.
-     * Un admin no puede quitarse su propio rol.
+     * Change a user's role. An admin cannot change their own role.
      */
     public function changeRole(Request $request, int $id): JsonResponse
     {
@@ -49,8 +74,17 @@ class AdminUserController extends Controller
             ], 422);
         }
 
-        $user = User::findOrFail($id);
+        $user    = User::findOrFail($id);
+        $oldRole = $user->role;
+
         $user->update(['role' => $request->role]);
+
+        AuditService::log('admin.user.role_changed', [
+            'auditable_type' => User::class,
+            'auditable_id'   => $user->id,
+            'old_values'     => ['role' => $oldRole],
+            'new_values'     => ['role' => $request->role],
+        ]);
 
         return response()->json([
             'success' => true,
@@ -61,18 +95,23 @@ class AdminUserController extends Controller
 
     /**
      * POST /api/admin/users/{id}/reset-password
-     * Genera y establece una contraseña aleatoria para el usuario.
-     * Devuelve la nueva contraseña en texto plano (solo en esta respuesta).
+     * Generate and set a random password for the user.
+     * Returns the new plain-text password (only in this response).
      */
     public function resetPassword(int $id): JsonResponse
     {
-        $user = User::findOrFail($id);
+        $user        = User::findOrFail($id);
         $newPassword = Str::random(12);
 
         $user->update(['password' => bcrypt($newPassword)]);
 
-        // Revocar todos los tokens del usuario (forzar re-login)
+        // Revoke all tokens to force re-login with new password
         $user->tokens()->delete();
+
+        AuditService::log('admin.user.password_reset', [
+            'auditable_type' => User::class,
+            'auditable_id'   => $user->id,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -83,7 +122,7 @@ class AdminUserController extends Controller
 
     /**
      * DELETE /api/admin/users/{id}
-     * Elimina un usuario. Un admin no puede eliminarse a sí mismo.
+     * Delete a user. An admin cannot delete themselves.
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
@@ -99,6 +138,17 @@ class AdminUserController extends Controller
         }
 
         $user = User::findOrFail($id);
+
+        AuditService::log('admin.user.deleted', [
+            'auditable_type' => User::class,
+            'auditable_id'   => $user->id,
+            'old_values'     => [
+                'name'  => $user->name,
+                'email' => $user->email,
+                'role'  => $user->role,
+            ],
+        ]);
+
         $user->tokens()->delete();
         $user->delete();
 

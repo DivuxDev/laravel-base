@@ -25,6 +25,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Log every HTTP request (runs after CORS, before auth resolution)
         $middleware->append(\App\Http\Middleware\LogHttpRequests::class);
 
+        // Add security headers to all responses
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
         // Register custom middleware aliases
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
