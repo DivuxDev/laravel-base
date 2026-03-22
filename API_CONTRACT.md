@@ -420,9 +420,145 @@ http://localhost:5173/auth/callback?error=google_auth_failed
 |---|---|
 | `user.login` | Login exitoso |
 | `user.registered` | Nuevo registro de usuario |
+| `user.password_reset_requested` | Solicitud de restablecimiento de contraseña |
+| `user.password_reset` | Contraseña restablecida exitosamente |
+| `user.email_verified` | Email verificado |
 | `admin.user.role_changed` | Admin cambió el rol de un usuario |
 | `admin.user.password_reset` | Admin reseteó la contraseña de un usuario |
-| `admin.user.deleted` | Admin eliminó un usuario |
+| `admin.user.deleted` | Admin eliminó un usuario (soft delete) |
+
+---
+
+## 13. Olvidé mi contraseña
+
+**`POST /api/auth/forgot-password`**
+
+> Rate limit: **5 intentos por minuto** por IP.
+
+### Request
+
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+### Response `200 OK`
+
+> Siempre devuelve éxito para prevenir enumeración de emails.
+
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "If an account with that email exists, we have sent a password reset link."
+}
+```
+
+---
+
+## 14. Restablecer contraseña
+
+**`POST /api/auth/reset-password`**
+
+> Rate limit: **5 intentos por minuto** por IP. El token expira en **60 minutos**.
+
+### Request
+
+```json
+{
+  "token": "abc123...",
+  "email": "john@example.com",
+  "password": "NewPassword1!",
+  "password_confirmation": "NewPassword1!"
+}
+```
+
+> **Política de contraseña:** mismas reglas que el registro.
+
+### Response `200 OK`
+
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "Password has been reset successfully."
+}
+```
+
+### Response `422 Unprocessable Entity` (token inválido/expirado)
+
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "Invalid or expired reset token."
+}
+```
+
+---
+
+## 15. Enviar email de verificación
+
+**`POST /api/auth/verify-email/send`**
+
+> Requiere cabecera `Authorization: Bearer {token}`. Rate limit: 6/min por usuario.
+
+### Response `200 OK`
+
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "Verification email sent."
+}
+```
+
+### Response `200 OK` (ya verificado)
+
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "Email already verified."
+}
+```
+
+---
+
+## 16. Verificar email
+
+**`POST /api/auth/verify-email`**
+
+### Request
+
+```json
+{
+  "id": 1,
+  "hash": "sha1_hash_of_email",
+  "signature": "hmac_signature"
+}
+```
+
+### Response `200 OK`
+
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "Email verified successfully."
+}
+```
+
+### Response `422 Unprocessable Entity`
+
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "Invalid verification link."
+}
+```
 
 ---
 
@@ -448,6 +584,8 @@ En producción (HTTPS) se añade: `Strict-Transport-Security: max-age=31536000; 
 |---|---|---|
 | Login | 10/min por IP | `POST /api/auth/login` |
 | Register | 5/min por IP | `POST /api/auth/register` |
+| Password reset | 5/min por IP | `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` |
+| Email verification | 6/min por usuario | `POST /api/auth/verify-email/send` |
 | Admin | 30/min por usuario | Todos los `/api/admin/*` |
 | User API | 60/min por usuario | `GET /api/user` |
 
@@ -505,6 +643,10 @@ export default api
 | `POST` | `/api/admin/users/{id}/reset-password` | Admin | 30/min | Resetear contraseña |
 | `DELETE` | `/api/admin/users/{id}` | Admin | 30/min | Eliminar usuario |
 | `GET` | `/api/admin/audit-logs` | Admin | 30/min | Registros de auditoría (paginado) |
+| `POST` | `/api/auth/forgot-password` | No | 5/min | Solicitar restablecimiento de contraseña |
+| `POST` | `/api/auth/reset-password` | No | 5/min | Restablecer contraseña con token |
+| `POST` | `/api/auth/verify-email/send` | Bearer | 6/min | Enviar/reenviar email de verificación |
+| `POST` | `/api/auth/verify-email` | No | — | Verificar email con token firmado |
 
 ---
 

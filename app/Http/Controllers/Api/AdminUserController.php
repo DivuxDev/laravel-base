@@ -9,6 +9,7 @@ use App\Services\AuditService;
 use App\Traits\Filterable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -100,18 +101,22 @@ class AdminUserController extends Controller
      */
     public function resetPassword(int $id): JsonResponse
     {
-        $user        = User::findOrFail($id);
-        $newPassword = Str::random(12);
+        $newPassword = DB::transaction(function () use ($id) {
+            $user        = User::findOrFail($id);
+            $newPassword = Str::random(12);
 
-        $user->update(['password' => bcrypt($newPassword)]);
+            $user->update(['password' => bcrypt($newPassword)]);
 
-        // Revoke all tokens to force re-login with new password
-        $user->tokens()->delete();
+            // Revoke all tokens to force re-login with new password
+            $user->tokens()->delete();
 
-        AuditService::log('admin.user.password_reset', [
-            'auditable_type' => User::class,
-            'auditable_id'   => $user->id,
-        ]);
+            AuditService::log('admin.user.password_reset', [
+                'auditable_type' => User::class,
+                'auditable_id'   => $user->id,
+            ]);
+
+            return $newPassword;
+        });
 
         return response()->json([
             'success' => true,
@@ -137,20 +142,22 @@ class AdminUserController extends Controller
             ], 422);
         }
 
-        $user = User::findOrFail($id);
+        DB::transaction(function () use ($id) {
+            $user = User::findOrFail($id);
 
-        AuditService::log('admin.user.deleted', [
-            'auditable_type' => User::class,
-            'auditable_id'   => $user->id,
-            'old_values'     => [
-                'name'  => $user->name,
-                'email' => $user->email,
-                'role'  => $user->role,
-            ],
-        ]);
+            AuditService::log('admin.user.deleted', [
+                'auditable_type' => User::class,
+                'auditable_id'   => $user->id,
+                'old_values'     => [
+                    'name'  => $user->name,
+                    'email' => $user->email,
+                    'role'  => $user->role,
+                ],
+            ]);
 
-        $user->tokens()->delete();
-        $user->delete();
+            $user->tokens()->delete();
+            $user->delete();
+        });
 
         return response()->json([
             'success' => true,

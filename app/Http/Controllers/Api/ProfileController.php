@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateProfileRequest;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ProfileController extends Controller
 {
@@ -24,7 +26,15 @@ class ProfileController extends Controller
         }
 
         if ($request->hasFile('avatar')) {
-            $path            = $request->file('avatar')->store('avatars', 'public');
+            // Delete old avatar from storage if one exists
+            if ($user->avatar) {
+                $afterStorage = Str::after($user->avatar, '/storage/');
+                if ($afterStorage !== $user->avatar) {
+                    Storage::disk('public')->delete($afterStorage);
+                }
+            }
+
+            $path              = $request->file('avatar')->store('avatars', 'public');
             $updates['avatar'] = asset('storage/' . $path);
         }
 

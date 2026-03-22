@@ -3,8 +3,10 @@
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ForgotPasswordController;
 use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,6 +30,18 @@ Route::prefix('auth')->group(function () {
     // Google OAuth
     Route::get('/google/redirect', [GoogleAuthController::class, 'redirect'])->name('auth.google.redirect');
     Route::get('/google/callback', [GoogleAuthController::class, 'callback'])->name('auth.google.callback');
+
+    // Password reset
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'forgotPassword'])
+        ->middleware('throttle:password-reset')
+        ->name('auth.forgot-password');
+    Route::post('/reset-password', [ForgotPasswordController::class, 'resetPassword'])
+        ->middleware('throttle:password-reset')
+        ->name('auth.reset-password');
+
+    // Email verification (public — users click link from email before logging in)
+    Route::post('/verify-email', [VerifyEmailController::class, 'verify'])
+        ->name('auth.verify-email');
 });
 
 /*
@@ -41,6 +55,11 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('throttle:user-api');
 
     Route::put('/user/profile', [ProfileController::class, 'update'])->name('user.profile.update');
+
+    // Email verification (resend — requires auth)
+    Route::post('/auth/verify-email/send', [VerifyEmailController::class, 'send'])
+        ->middleware('throttle:6,1')
+        ->name('auth.verify-email.send');
 
     /*
     |----------------------------------------------------------------------

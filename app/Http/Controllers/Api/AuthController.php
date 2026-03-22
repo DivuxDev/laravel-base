@@ -6,6 +6,7 @@ use App\Events\UserLoggedIn;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Mail\VerificationEmail;
 use App\Mail\WelcomeEmail;
 use App\Models\User;
 use App\Services\AuditService;
@@ -34,6 +35,20 @@ class AuthController extends Controller
 
         try {
             $this->mail->send(new WelcomeEmail($user), $user->email);
+        } catch (\Throwable) {
+            // Mail unavailable — registration proceeds normally
+        }
+
+        try {
+            $hash      = sha1($user->email);
+            $signature = hash_hmac('sha256', $user->id . '|' . $hash, config('app.key'));
+            $verificationUrl = config('app.frontend_url')
+                . '/verify-email'
+                . '?id=' . $user->id
+                . '&hash=' . $hash
+                . '&signature=' . $signature;
+
+            $this->mail->send(new VerificationEmail($user, $verificationUrl), $user->email);
         } catch (\Throwable) {
             // Mail unavailable — registration proceeds normally
         }

@@ -20,18 +20,22 @@ REST API backend built with **Laravel 12**, **Sanctum** token authentication, **
 
 ## Features
 
-- **Authentication** — Register, login, logout with Sanctum Bearer tokens
+- **Authentication** — Register, login, logout with Sanctum Bearer tokens (24h expiration)
 - **Google OAuth** — Login with Google via Socialite
+- **Password reset** — Token-based forgot/reset password flow via email (60-minute expiry, anti-enumeration)
+- **Email verification** — HMAC-signed verification links, sent on registration + resend endpoint
 - **Role-based access** — Admin/user roles with middleware guard
 - **Brute force protection** — Account lockout after 5 failed login attempts (15 min)
 - **Password policy** — Requires uppercase, lowercase, number, and special character
 - **Security headers** — X-Content-Type-Options, X-Frame-Options, HSTS, Referrer-Policy, Permissions-Policy
-- **Rate limiting** — Per-route throttling: login (10/min), register (5/min), admin (30/min), user API (60/min)
+- **Rate limiting** — Per-route throttling: login (10/min), register (5/min), password-reset (5/min), admin (30/min), user API (60/min)
 - **Audit logging** — Automatic logging of admin actions (role changes, password resets, deletions) and auth events
+- **Soft deletes** — Users are soft-deleted; admin deletion is recoverable
+- **DB transactions** — Destructive admin operations wrapped in transactions for data integrity
 - **Pagination & filtering** — Generic `Filterable` trait with search, sort, and pagination for any endpoint
-- **Profile editing** — Update name and upload avatar
+- **Profile editing** — Update name and upload avatar (old avatars auto-cleaned)
 - **WebSocket events** — Real-time login notifications via Laravel Reverb
-- **Email delivery** — Welcome email on registration via Mailtrap
+- **Email delivery** — Welcome, verification, and password reset emails via Mailtrap
 
 ---
 
@@ -136,6 +140,8 @@ app/
 ├── Http/
 │   ├── Controllers/Api/
 │   │   ├── AuthController.php     # register, login, logout, user
+│   │   ├── ForgotPasswordController.php # forgot/reset password flow
+│   │   ├── VerifyEmailController.php    # email verification
 │   │   ├── GoogleAuthController.php
 │   │   ├── AdminUserController.php # paginated users, role change, reset pw, delete
 │   │   ├── AuditLogController.php  # paginated audit logs with filters
@@ -152,9 +158,11 @@ app/
 │       ├── UserResource.php
 │       └── AuditLogResource.php
 ├── Mail/
-│   └── WelcomeEmail.php           # Sent on register via Mailtrap
+│   ├── WelcomeEmail.php           # Sent on register via Mailtrap
+│   ├── VerificationEmail.php      # Email verification link
+│   └── ResetPasswordEmail.php     # Password reset link
 ├── Models/
-│   ├── User.php                   # Brute force protection methods
+│   ├── User.php                   # Brute force, soft deletes, email verification
 │   └── AuditLog.php               # Audit log entries
 ├── Services/
 │   ├── MailService.php
@@ -200,6 +208,9 @@ All responses follow a unified envelope:
 | `GET` | `/api/health` | Health check — returns `{ "status": "ok" }` | — |
 | `POST` | `/api/auth/register` | Register — returns `{ user, token }` | 5/min per IP |
 | `POST` | `/api/auth/login` | Login — returns `{ user, token }` | 10/min per IP |
+| `POST` | `/api/auth/forgot-password` | Request password reset email | 5/min per IP |
+| `POST` | `/api/auth/reset-password` | Reset password with token | 5/min per IP |
+| `POST` | `/api/auth/verify-email` | Verify email with signed link | — |
 | `GET` | `/api/auth/google/redirect` | Redirects browser to Google consent screen | — |
 | `GET` | `/api/auth/google/callback` | Google callback — redirects to frontend with token | — |
 
@@ -210,6 +221,7 @@ All responses follow a unified envelope:
 | `POST` | `/api/auth/logout` | Revokes current token | — |
 | `GET` | `/api/user` | Returns authenticated user profile | 60/min |
 | `PUT` | `/api/user/profile` | Update name and/or avatar (multipart/form-data) | — |
+| `POST` | `/api/auth/verify-email/send` | Send/resend verification email | 6/min |
 
 ### Admin routes (Bearer token + `role = admin`)
 
@@ -220,7 +232,7 @@ All admin routes: **30 req/min** per user.
 | `GET` | `/api/admin/users` | List users (paginated, searchable, sortable) |
 | `PATCH` | `/api/admin/users/{id}/role` | Change role (`admin` or `user`). Cannot change own role |
 | `POST` | `/api/admin/users/{id}/reset-password` | Generate random password, revoke all tokens |
-| `DELETE` | `/api/admin/users/{id}` | Delete user. Cannot delete own account |
+| `DELETE` | `/api/admin/users/{id}` | Soft-delete user. Cannot delete own account |
 | `GET` | `/api/admin/audit-logs` | List audit logs (paginated, filterable by action/date/user) |
 
 ### Pagination query params (for paginated endpoints)
@@ -283,6 +295,7 @@ Applied globally via `SecurityHeaders` middleware:
 |---|---|---|
 | `login` | 10/min per IP | `POST /api/auth/login` |
 | `register` | 5/min per IP | `POST /api/auth/register` |
+| `password-reset` | 5/min per IP | `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` |
 | `admin` | 30/min per user | All `/api/admin/*` routes |
 | `user-api` | 60/min per user | `GET /api/user` |
 
@@ -298,9 +311,12 @@ Admin actions and auth events are recorded in the `audit_logs` table via `AuditS
 |---|---|
 | `user.login` | Successful login |
 | `user.registered` | New user registration |
+| `user.password_reset_requested` | Password reset requested |
+| `user.password_reset` | Password reset completed |
+| `user.email_verified` | Email verified |
 | `admin.user.role_changed` | Admin changes a user's role |
 | `admin.user.password_reset` | Admin resets a user's password |
-| `admin.user.deleted` | Admin deletes a user |
+| `admin.user.deleted` | Admin soft-deletes a user |
 
 Each entry records: performing user, target model, old/new values, IP address, user agent, and timestamp.
 
@@ -361,7 +377,11 @@ echo.channel('notifications').listen('.user.logged-in', (e) => {
 
 ## Mail
 
-A `WelcomeEmail` is sent automatically on user registration via `MailService`. If mail is unavailable, registration proceeds normally (try/catch).
+Emails are sent via `MailService`. If mail is unavailable, core operations proceed normally (try/catch).
+
+- **WelcomeEmail** — sent on registration
+- **VerificationEmail** — sent on registration + resend endpoint
+- **ResetPasswordEmail** — sent via forgot-password endpoint
 
 | Environment | Host | Port | Username | Password |
 |---|---|---|---|---|
